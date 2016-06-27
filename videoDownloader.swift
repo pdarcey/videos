@@ -46,7 +46,12 @@ func processLaunchArguments() {
 
 				case "-s":
 					if i <= arguments.count {
-						let sessions = arguments[i] as String
+						var sessions = ""
+						var j = i
+						while j < arguments.count && !arguments[j].hasPrefix("-") {
+							sessions = sessions + arguments[j] as String
+							j += 1
+						}
 						sessionIDs = sessions.componentsSeparatedByString(",")
 						getAll = false
 						message = message + "\nDownloading for sessions: \(sessionIDs)"
@@ -89,9 +94,15 @@ func processLaunchArguments() {
 }
 
 func displaySyntaxError() {
-	    print("videoDownloader")
         print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
-        print("usage: videoDownloader.swift [-d directory] [-a] [-s ] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
+        print("OPTIONS\n")
+        print("-d        A directory to download the videos to. By default, the download goes in the current working directory")
+        print("-a        Download all the session videos (the default)")
+        print("-s        A list of one or more session IDs, separated by commas (e.g -s 100, 101, 102 etc)")
+        print("-hd | -sd Choose -hd for HD videos (the default) or -sd for SD videos")
+        print("-pdf-only Only get PDFs, i.e. do not download the videos")
+        print("-nopdf    Do not download the related PDFs")
+        print("-y        The year to use. The default is 2016. Use a four-digit year")
         exit(0)
 }
 
