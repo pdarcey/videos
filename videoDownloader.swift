@@ -11,6 +11,7 @@ enum Resolution {
 	case HD, SD
 }
 
+// Set default values
 // Default to get all HD videos from this year, no PDFs, and save to current directory
 var resolution : Resolution = .HD
 var getAll : Bool = true
@@ -20,6 +21,9 @@ var year : Int = 2016
 var saveToDirectory : String = "" // TODO: set proper default
 var sessionIDs : [String] = []
 var message : String = ""
+var userSetGetAll = false
+var userSetSessionList = false
+
 
 func processLaunchArguments() {
 	// Processing launch arguments
@@ -41,22 +45,32 @@ func processLaunchArguments() {
 					}
 	
 				case "-a":
-					getAll = true
-					message = message + "\nGet all videos"
+					userSetGetAll = true
+					if userSetSessionList {
+						displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
+					} else {
+						getAll = true
+						message = message + "\nGet all videos"
+					}
 
 				case "-s":
-					if i <= arguments.count {
-						var sessions = ""
-						var j = i
-						while j < arguments.count && !arguments[j].hasPrefix("-") {
-							sessions = sessions + arguments[j] as String
-							j += 1
-						}
-						sessionIDs = sessions.componentsSeparatedByString(",")
-						getAll = false
-						message = message + "\nDownloading for sessions: \(sessionIDs)"
-					} else {
+					userSetSessionList = true
+					if userSetGetAll {
 						displaySyntaxError()
+					} else {
+						if i <= arguments.count {
+							var sessions = ""
+							var j = i
+							while j < arguments.count && !arguments[j].hasPrefix("-") {
+								sessions = sessions + arguments[j] as String
+								j += 1
+							}
+							sessionIDs = sessions.componentsSeparatedByString(",")
+							getAll = false
+							message = message + "\nDownloading for sessions: \(sessionIDs)"
+						} else {
+							displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
+						}
 					}
 	
 				case "-sd":
@@ -93,8 +107,11 @@ func processLaunchArguments() {
 	print(message)
 }
 
-func displaySyntaxError() {
+func displaySyntaxError(additionalMessage: String? = nil) {
         print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
+        if let message = additionalMessage {
+        	print("\(message)\n")
+        }
         print("OPTIONS\n")
         print("-d        A directory to download the videos to. By default, the download goes in the current working directory")
         print("-a        Download all the session videos (the default)")
@@ -104,6 +121,10 @@ func displaySyntaxError() {
         print("-nopdf    Do not download the related PDFs")
         print("-y        The year to use. The default is 2016. Use a four-digit year")
         exit(0)
+}
+
+func getListOfAllSessions() {
+
 }
 
 func getDownloads() {
