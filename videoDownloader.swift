@@ -123,12 +123,52 @@ func displaySyntaxError(additionalMessage: String? = nil) {
         exit(0)
 }
 
+func getHTMLPage(url: NSURL) -> String {
+    do {
+        let rawHTML = try String(contentsOfURL: url)
+        	return rawHTML
+    } catch let error as NSError {
+        print("Error: \(error)")
+        exit(0)
+    }
+}
+
 func getListOfAllSessions() {
+	let baseString = "https://developer.apple.com/videos/wwdc\(year)/"
+	guard let baseURL = NSURL(string: baseString)
+	else {
+		print("Error: \(baseString) doesn't seem to be a valid URL")
+		exit(0)
+    }
+    
+	let htmlPage = getHTMLPage(baseURL)
+	let regexString = "/videos/play/wwdc\(year)/([0-9]*)/"
+    
+    do {
+		let regex = try NSRegularExpression(pattern: regexString, options: [])
+		let nsHTMLPage = htmlPage as NSString
+		let results = regex.matchesInString(htmlPage, options: [], range: NSMakeRange(0, nsHTMLPage.length))
+		var sessionArray : [String] = []
+        for result in results {
+			let matchedRange = result.rangeAtIndex(1)
+			let matchedString = nsHTMLPage.substringWithRange(matchedRange)
+			sessionArray.append(matchedString)
+       }
+        
+        let uniqueIDs = Array(Set(sessionArray))
+        sessionIDs = uniqueIDs.sort { $0 < $1 }
+        print("Getting all \(sessionIDs.count) sessions: \(sessionIDs)")
+    } catch let error as NSError {
+        print("Regex error: \(error.localizedDescription)")
+    }
 
 }
 
 func getDownloads() {
-
+	if getAll {
+		getListOfAllSessions()
+	}
+	
 }
 
 // Where the work is done
