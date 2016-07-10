@@ -123,6 +123,15 @@ func displaySyntaxError(additionalMessage: String? = nil) {
         exit(0)
 }
 
+func validateURL(url : String) -> NSURL {
+	guard let baseURL = NSURL(string: url)
+	else {
+		print("Error: \(baseString) doesn't seem to be a valid URL")
+		exit(0)
+	}
+	return baseURL
+}
+
 func getHTMLPage(url: NSURL) -> String {
     do {
         let rawHTML = try String(contentsOfURL: url)
@@ -136,11 +145,7 @@ func getHTMLPage(url: NSURL) -> String {
 
 func getListOfAllSessions() -> Array {
 	let baseString = "https://developer.apple.com/videos/wwdc\(year)/"
-	guard let baseURL = NSURL(string: baseString)
-	else {
-		print("Error: \(baseString) doesn't seem to be a valid URL")
-		exit(0)
-    }
+	let baseURL = validateURL(baseString)
     
 	let htmlPage = getHTMLPage(baseURL)
 	let regexString = "/videos/play/wwdc\(year)/([0-9]*)/"
@@ -149,7 +154,7 @@ func getListOfAllSessions() -> Array {
     
 }
 
-
+// TODO: remove nsHTMLPage methods and replace with htmlPage functions
 func extractRegex(htmlPage : String, regexString : String) -> Array {
     do {
 		let regex = try NSRegularExpression(pattern: regexString, options: [])
@@ -170,8 +175,20 @@ func extractRegex(htmlPage : String, regexString : String) -> Array {
     }
 }
 
-func downloadSession(downloadURL : String) {
-
+func downloadSession(downloadURL : NSURL, toURL : NSURL) {
+        guard let dataFromURL = NSData(contentsOfURL: downloadURL)
+        else {
+            let error = NSError(domain:"Error downloading file", code:800, userInfo:nil)
+            completion(path: destinationUrl.path!, error: error)
+            return
+        }
+        
+        if dataFromURL.writeToURL(toURL, atomically: true) {
+            completion(path: destinationUrl.path!, error:nil)
+        } else {
+            let error = NSError(domain:"Error saving file", code:800, userInfo:nil)
+            completion(path: destinationUrl.path!, error:error)
+        }
 }
 
 func getDownloads() {
@@ -181,22 +198,19 @@ func getDownloads() {
 	if getVideo {
 		for session in sessionIDs {
 			let baseString = "https://developer.apple.com/videos/play/wwdc\(year)/\(session)/"
-			guard let baseURL = NSURL(string: baseString)
-			else {
-				print("Error: \(baseString) doesn't seem to be a valid URL")
-				exit(0)
-			}
+			let baseURL = validateURL(baseString)
 	
 			let htmlPage = getHTMLPage(baseURL)
 			let regexString = "<a\ href=\"(.+)\?dl=1\">\(resolution.RawValue) Video")
-			let downloadURL = extractRegex(htmlPage, regexString)
+			let urlString = extractRegex(htmlPage, regexString)
+			let downloadURL = validateURL(urlString)
 			
 			downloadSession(downloadURL)
 		}
 	}
 }
 
-// Where the work is done
+// MARK: Where the work is done
 
 processLaunchArguments()
 getDownloads()
