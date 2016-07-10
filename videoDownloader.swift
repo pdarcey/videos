@@ -56,7 +56,7 @@ func processLaunchArguments() {
 				case "-s":
 					userSetSessionList = true
 					if userSetGetAll {
-						displaySyntaxError()
+						displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
 					} else {
 						if i <= arguments.count {
 							var sessions = ""
@@ -67,9 +67,9 @@ func processLaunchArguments() {
 							}
 							sessionIDs = sessions.componentsSeparatedByString(",")
 							getAll = false
-							message = message + "\nDownloading for sessions: \(sessionIDs)"
+							message = message + "Downloading \(sessionIDs.count) sessions: \(sessionIDs)"
 						} else {
-							displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
+							displaySyntaxError()
 						}
 					}
 	
@@ -126,14 +126,15 @@ func displaySyntaxError(additionalMessage: String? = nil) {
 func getHTMLPage(url: NSURL) -> String {
     do {
         let rawHTML = try String(contentsOfURL: url)
-        	return rawHTML
+        
+        return rawHTML
     } catch let error as NSError {
         print("Error: \(error)")
         exit(0)
     }
 }
 
-func getListOfAllSessions() {
+func getListOfAllSessions() -> Array {
 	let baseString = "https://developer.apple.com/videos/wwdc\(year)/"
 	guard let baseURL = NSURL(string: baseString)
 	else {
@@ -143,7 +144,13 @@ func getListOfAllSessions() {
     
 	let htmlPage = getHTMLPage(baseURL)
 	let regexString = "/videos/play/wwdc\(year)/([0-9]*)/"
+	
+	return extractRegex(htmlPage, regexString)
     
+}
+
+
+func extractRegex(htmlPage : String, regexString : String) -> Array {
     do {
 		let regex = try NSRegularExpression(pattern: regexString, options: [])
 		let nsHTMLPage = htmlPage as NSString
@@ -156,19 +163,37 @@ func getListOfAllSessions() {
        }
         
         let uniqueIDs = Array(Set(sessionArray))
-        sessionIDs = uniqueIDs.sort { $0 < $1 }
+        return uniqueIDs.sort { $0 < $1 }
         print("Getting all \(sessionIDs.count) sessions: \(sessionIDs)")
     } catch let error as NSError {
         print("Regex error: \(error.localizedDescription)")
     }
+}
+
+func downloadSession(downloadURL : String) {
 
 }
 
 func getDownloads() {
 	if getAll {
-		getListOfAllSessions()
+		sessionIDs = getListOfAllSessions()
 	}
+	if getVideo {
+		for session in sessionIDs {
+			let baseString = "https://developer.apple.com/videos/play/wwdc\(year)/\(session)/"
+			guard let baseURL = NSURL(string: baseString)
+			else {
+				print("Error: \(baseString) doesn't seem to be a valid URL")
+				exit(0)
+			}
 	
+			let htmlPage = getHTMLPage(baseURL)
+			let regexString = "<a\ href=\"(.+)\?dl=1\">\(resolution.RawValue) Video")
+			let downloadURL = extractRegex(htmlPage, regexString)
+			
+			downloadSession(downloadURL)
+		}
+	}
 }
 
 // Where the work is done
