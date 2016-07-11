@@ -32,7 +32,6 @@ var getAll : Bool = true
 var getVideo : Bool = true
 var getPDF : Bool = false
 var year : Int = 2016
-var saveToDirectory : String = "" // TODO: set proper default
 var saveToDirectory : String = "~/Downloads"
 var sessionIDs : [String] = []
 var message : String = ""
@@ -122,19 +121,19 @@ func processLaunchArguments() {
 }
 
 func displaySyntaxError(additionalMessage: String? = nil) {
-        print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
-        if let message = additionalMessage {
-        	print("\(message)\n")
-        }
-        print("OPTIONS\n")
-        print("-d        A directory to download the videos to. By default, the download goes in the current working directory")
-        print("-a        Download all the session videos (the default)")
-        print("-s        A list of one or more session IDs, separated by commas (e.g -s 100, 101, 102 etc)")
-        print("-hd | -sd Choose -hd for HD videos (the default) or -sd for SD videos")
-        print("-pdf-only Only get PDFs, i.e. do not download the videos")
-        print("-nopdf    Do not download the related PDFs")
-        print("-y        The year to use. The default is 2016. Use a four-digit year")
-        exit(0)
+    print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
+    if let message = additionalMessage {
+        print("\(message)\n")
+    }
+    print("OPTIONS\n")
+    print("-d        A directory to download the videos to. By default, the download goes in the current working directory")
+    print("-a        Download all the session videos (the default)")
+    print("-s        A list of one or more session IDs, separated by commas (e.g -s 100, 101, 102 etc)")
+    print("-hd | -sd Choose -hd for HD videos (the default) or -sd for SD videos")
+    print("-pdf-only Only get PDFs, i.e. do not download the videos")
+    print("-nopdf    Do not download the related PDFs")
+    print("-y        The year to use. The default is 2016. Use a four-digit year")
+    exit(0)
 }
 
 func validateURL(url : String) -> NSURL {
