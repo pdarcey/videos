@@ -12,102 +12,113 @@ enum Resolution : String {
     case hd = "HD"
     case sd = "SD"
 }
+
+extension String {
+    func rangeFromNSRange(nsRange : NSRange) -> Range<String.Index>? {
+        let from16 = utf16.startIndex.advancedBy(nsRange.location, limit: utf16.endIndex)
+        let to16 = from16.advancedBy(nsRange.length, limit: utf16.endIndex)
+        if let from = String.Index(from16, within: self),
+            let to = String.Index(to16, within: self) {
+            return from ..< to
+        }
+        return nil
+    }
 }
 
 // Set default values
 // Default to get all HD videos from this year, no PDFs, and save to current directory
-var resolution : Resolution = .HD
+var resolution : Resolution = .hd
 var getAll : Bool = true
 var getVideo : Bool = true
 var getPDF : Bool = false
 var year : Int = 2016
 var saveToDirectory : String = "" // TODO: set proper default
+var saveToDirectory : String = "~/Downloads"
 var sessionIDs : [String] = []
 var message : String = ""
 var userSetGetAll = false
 var userSetSessionList = false
 
-
 func processLaunchArguments() {
-	// Processing launch arguments
-	// http://ericasadun.com/2014/06/12/swift-at-the-command-line/
-	let arguments = Process.arguments
-	
-	var i = 0
-
-	for argument in arguments {
-		i += 1
-		if argument.hasPrefix("-") {   
-			switch argument {
-				case "-d":
-					if i <= arguments.count {
-						let saveToDirectory = arguments[i] as String
-						message = message + "\nDownloading to directory: \(saveToDirectory)"
-					} else {
-						displaySyntaxError()
-					}
-	
-				case "-a":
-					userSetGetAll = true
-					if userSetSessionList {
-						displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
-					} else {
-						getAll = true
-						message = message + "\nGet all videos"
-					}
-
-				case "-s":
-					userSetSessionList = true
-					if userSetGetAll {
-						displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
-					} else {
-						if i <= arguments.count {
-							var sessions = ""
-							var j = i
-							while j < arguments.count && !arguments[j].hasPrefix("-") {
-								sessions = sessions + arguments[j] as String
-								j += 1
-							}
-							sessionIDs = sessions.componentsSeparatedByString(",")
-							getAll = false
-							message = message + "Downloading \(sessionIDs.count) sessions: \(sessionIDs)"
-						} else {
-							displaySyntaxError()
-						}
-					}
-	
-				case "-sd":
-					resolution = .SD
-					message = message + "\nGet SD resolution"
-				
-				case "-hd":
-					resolution = .HD
-					message = message + "\nGet HD resolution"
-	
-				case "-nopdf":
-					getPDF = false
-					message = message + "\nDon't get PDFs"
-	
-				case "-pdfonly":
-					getPDF = true
-					getVideo = false
-					message = message + "\nOnly get PDFs"
-	
-				case "-y":
-					if i <= arguments.count {
-						let year = Int(arguments[i])
-						message = message + "\nGet downloads from \(year)"
-
-					} else {
-						displaySyntaxError()
-					}
-		
-				default:
-					displaySyntaxError()
-			}
-		}
-	}
-	print(message)
+    // Processing launch arguments
+    // http://ericasadun.com/2014/06/12/swift-at-the-command-line/
+    let arguments = Process.arguments
+    
+    var i = 0
+    
+    for argument in arguments {
+        i += 1
+        if argument.hasPrefix("-") {
+            switch argument {
+            case "-d":										// Nominate the directory to save downloads to. Default is ~/Downloads
+                if i <= arguments.count {
+                    let saveToDirectory = arguments[i] as String
+                    message = message + "\nDownloading to directory: \(saveToDirectory)"
+                } else {
+                    displaySyntaxError()
+                }
+                
+            case "-a":										// Get all sessions
+                userSetGetAll = true
+                if userSetSessionList {
+                    displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
+                } else {
+                    getAll = true
+                    message = message + "\nGet all videos"
+                }
+                
+            case "-s":										// Nominate which sessions to download
+                userSetSessionList = true
+                if userSetGetAll {
+                    displaySyntaxError("*** You have set both the -a and -s options. These are mutually exclusive ***")
+                } else {
+                    if i <= arguments.count {
+                        var sessions = ""
+                        var j = i
+                        while j < arguments.count && !arguments[j].hasPrefix("-") {
+                            sessions = sessions + arguments[j] as String
+                            j += 1
+                        }
+                        sessionIDs = sessions.componentsSeparatedByString(",")
+                        getAll = false
+                        message = message + "Downloading \(sessionIDs.count) sessions: \(sessionIDs)"
+                    } else {
+                        displaySyntaxError()
+                    }
+                }
+                
+            case "-sd":										// Get SD videos
+                resolution = .sd
+                message = message + "\nGet SD resolution"
+                
+            case "-hd":										// Get HD videos
+                resolution = .hd
+                message = message + "\nGet HD resolution"
+                
+            case "-nopdf":									// Don't get the associated PDFs
+                getPDF = false
+                message = message + "\nDon't get PDFs"
+                
+            case "-pdfonly":								// Only download the PDFs (and not the videos)
+                getPDF = true
+                getVideo = false
+                message = message + "\nOnly get PDFs"
+                
+            case "-y":										// Nominate the year
+                if i <= arguments.count {
+                    let year = Int(arguments[i])
+                    message = message + "\nGet downloads from \(year)"
+                    
+                } else {
+                    displaySyntaxError()
+                }
+                
+            default:
+                displaySyntaxError()
+            }
+        }
+    }
+    print(message)
 }
 
 func displaySyntaxError(additionalMessage: String? = nil) {
