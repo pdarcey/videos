@@ -168,25 +168,28 @@ func getListOfAllSessions() -> [String] {
     return result
 }
 
-// TODO: remove nsHTMLPage methods and replace with htmlPage functions
-func extractRegex(htmlPage : String, regexString : String) -> Array {
+func extract(regularExpression: String, from text: String) -> [String] {
+    var returnArray : [String] = []
     do {
-		let regex = try NSRegularExpression(pattern: regexString, options: [])
-		let nsHTMLPage = htmlPage as NSString
-		let results = regex.matchesInString(htmlPage, options: [], range: NSMakeRange(0, nsHTMLPage.length))
-		var sessionArray : [String] = []
-        for result in results {
-			let matchedRange = result.rangeAtIndex(1)
-			let matchedString = nsHTMLPage.substringWithRange(matchedRange)
-			sessionArray.append(matchedString)
-       }
+        let regex = try NSRegularExpression(pattern: regularExpression, options: [])
+        let matches = regex.matchesInString(text, options: [], range: NSMakeRange(0, text.characters.count))
+        var matchingResults : [String] = []
+        for match in matches {
+            if !NSEqualRanges(match.range, NSMakeRange(NSNotFound, 0)) {
+                let captureGroup = match.rangeAtIndex(1)
+                let matchedRange = text.rangeFromNSRange(captureGroup)
+                let matchedString = text.substringWithRange(matchedRange!)
+                matchingResults.append(matchedString)
+            }
+        }
         
-        let uniqueIDs = Array(Set(sessionArray))
-        return uniqueIDs.sort { $0 < $1 }
-        print("Getting all \(sessionIDs.count) sessions: \(sessionIDs)")
+        let uniqueIDs = Array(Set(matchingResults))
+        returnArray = uniqueIDs.sort { $0 < $1 }
+        return returnArray
     } catch let error as NSError {
         print("Regex error: \(error.localizedDescription)")
     }
+    return returnArray
 }
 
 func downloadSession(downloadURL : NSURL, toURL : NSURL) {
