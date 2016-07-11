@@ -1,14 +1,17 @@
 #!/usr/bin/env xcrun swift
 
- /*
- © 2016 Paul Darcey
+/*
+ Script to download all (or some) WWDC session videos, using Swift as a scripting language
  
+ © 2016 Paul Darcey
  */
 
 import Foundation
 
-enum Resolution {
-	case HD, SD
+enum Resolution : String {
+    case hd = "HD"
+    case sd = "SD"
+}
 }
 
 // Set default values
