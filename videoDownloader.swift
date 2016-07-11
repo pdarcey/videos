@@ -137,12 +137,12 @@ func displaySyntaxError(additionalMessage: String? = nil) {
 }
 
 func validateURL(url : String) -> NSURL {
-	guard let baseURL = NSURL(string: url)
-	else {
-		print("Error: \(baseString) doesn't seem to be a valid URL")
-		exit(0)
-	}
-	return baseURL
+    guard let baseURL = NSURL(string: url)
+        else {
+            print("Error: \(url) doesn't seem to be a valid URL")
+            exit(0)
+    }
+    return baseURL
 }
 
 func getHTMLPage(url: NSURL) -> String {
@@ -156,15 +156,16 @@ func getHTMLPage(url: NSURL) -> String {
     }
 }
 
-func getListOfAllSessions() -> Array {
-	let baseString = "https://developer.apple.com/videos/wwdc\(year)/"
-	let baseURL = validateURL(baseString)
+func getListOfAllSessions() -> [String] {
+    let baseString = "https://developer.apple.com/videos/wwdc\(year)/"
+    let baseURL = validateURL(baseString)
     
-	let htmlPage = getHTMLPage(baseURL)
-	let regexString = "/videos/play/wwdc\(year)/([0-9]*)/"
-	
-	return extractRegex(htmlPage, regexString)
+    let htmlPage = getHTMLPage(baseURL)
+    let regexString = "/videos/play/wwdc\(year)/([0-9]*)/"
     
+    let result = extract(regexString, from: htmlPage)
+    print("Getting all \(result.count) sessions: \(result)")
+    return result
 }
 
 // TODO: remove nsHTMLPage methods and replace with htmlPage functions
@@ -205,26 +206,25 @@ func downloadSession(downloadURL : NSURL, toURL : NSURL) {
 }
 
 func getDownloads() {
-	if getAll {
-		sessionIDs = getListOfAllSessions()
-	}
-	if getVideo {
-		for session in sessionIDs {
-			let baseString = "https://developer.apple.com/videos/play/wwdc\(year)/\(session)/"
-			let baseURL = validateURL(baseString)
-	
-			let htmlPage = getHTMLPage(baseURL)
-			let regexString = "<a\ href=\"(.+)\?dl=1\">\(resolution.RawValue) Video")
-			let urlString = extractRegex(htmlPage, regexString)
-			let downloadURL = validateURL(urlString)
-			
-			downloadSession(downloadURL)
-		}
-	}
+    if getAll {
+        sessionIDs = getListOfAllSessions()
+    }
+    if getVideo {
+        for session in sessionIDs {
+            let baseString = "https://developer.apple.com/videos/play/wwdc\(year)/\(session)/"
+            let baseURL = validateURL(baseString)
+            
+            let htmlPage = getHTMLPage(baseURL)
+            let regexString = "<a\\ href=\\\"(.+)\\?dl=1\\\">\(resolution.rawValue)\\ Video"
+            let urlString = extract(regexString, from: htmlPage)
+            let downloadURL = validateURL(urlString[0])
+            
+            downloadSession(downloadURL, toURL: downloadURL)
+        }
+    }
 }
 
 // MARK: Where the work is done
-
 processLaunchArguments()
 getDownloads()
 
