@@ -14,6 +14,7 @@ enum Resolution : String {
 }
 
 extension String {
+	// Based on a solution at http://stackoverflow.com/questions/25138339/nsrange-to-rangestring-index/32379600#32379600 by Serhii Yakovenko
     func rangeFromNSRange(nsRange : NSRange) -> Range<String.Index>? {
         let from16 = utf16.startIndex.advancedBy(nsRange.location, limit: utf16.endIndex)
         let to16 = from16.advancedBy(nsRange.length, limit: utf16.endIndex)
@@ -26,6 +27,7 @@ extension String {
 }
 
 extension Double {
+	// Based on a solution at http://stackoverflow.com/questions/24102814/how-to-use-println-in-swift-to-format-number by Daniel Howard
     var percentage : String {
         get {
             let numberFormatter = NSNumberFormatter()
@@ -37,6 +39,7 @@ extension Double {
 }
 
 extension Int64 {
+	// Based on a solution at http://stackoverflow.com/questions/3263892/format-file-size-as-mb-gb-etc?noredirect=1&lq=1 by Willem Van Onsem
     var iso : String {
         get {
             let units = [ "B", "kB", "MB", "GB", "TB" ]
@@ -232,6 +235,7 @@ extension Web {
 }
 
 class Downloader : NSObject, NSURLSessionDownloadDelegate {
+	// Based on a solution at http://stackoverflow.com/questions/28219848/download-file-in-swift by Ahmet Akkök
     var url : NSURL?
     var fileName : String?
     
