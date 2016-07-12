@@ -6,7 +6,7 @@
  © 2016 Paul Darcey
  */
 
-import Foundation
+import Cocoa
 
 enum Resolution : String {
     case hd = "HD"
@@ -25,20 +25,43 @@ extension String {
     }
 }
 
+extension Double {
+    var percentage : String {
+        get {
+            let numberFormatter = NSNumberFormatter()
+            numberFormatter.numberStyle = NSNumberFormatterStyle.DecimalStyle
+            numberFormatter.maximumSignificantDigits = 2
+            return numberFormatter.stringFromNumber(self)!
+        }
+    }
+}
+
+extension Int64 {
+    var iso : String {
+        get {
+            let units = [ "B", "kB", "MB", "GB", "TB" ]
+            let magnitude = Int(log10(Double(self))/log10(1024))
+            let numberFormatter = NSNumberFormatter()
+            let number = Double(self)/pow(1024.0, Double(magnitude))
+            numberFormatter.numberStyle = NSNumberFormatterStyle.DecimalStyle
+            numberFormatter.maximumSignificantDigits = 2
+            return "\(numberFormatter.stringFromNumber(number)!) \(units[magnitude])"
+        }
+    }
+}
+
 class Setup {
     // Set default values
-    // Default to get all HD videos from this year, no PDFs, and save to current directory
+    // Default to get all HD videos from this year, and save to current directory
     var resolution : Resolution = .hd
     var getAll : Bool = true
-    var getVideo : Bool = true
-    var getPDF : Bool = false
     var year : Int = 2016
     var saveToDirectory : String = "WWDCVideos"
     var sessionIDs : [String] = []
     var message : String = ""
     var userSetGetAll = false
     var userSetSessionList = false
-
+    
     func processLaunchArguments() {
         // Processing launch arguments
         // http://ericasadun.com/2014/06/12/swift-at-the-command-line/
@@ -50,10 +73,10 @@ class Setup {
             i += 1
             if argument.hasPrefix("-") {
                 switch argument {
-                case "-d":										// Nominate the directory to save downloads to. Default is ~/Downloads
+                case "-d":										// Nominate the directory to save downloads to. Default is ~/WWDCVideos
                     if i <= arguments.count {
                         self.saveToDirectory = arguments[i] as String
-                        self.message = self.message + "\nDownloading to directory: \(self.saveToDirectory)"
+                        self.message = self.message + "\nDownloading to directory: ~/\(self.saveToDirectory)"
                     } else {
                         displaySyntaxError()
                     }
@@ -95,15 +118,6 @@ class Setup {
                     self.resolution = .hd
                     self.message = self.message + "\nGet HD resolution"
                     
-                case "-nopdf":									// Don't get the associated PDFs
-                    self.getPDF = false
-                    self.message = self.message + "\nDon't get PDFs"
-                    
-                case "-pdfonly":								// Only download the PDFs (and not the videos)
-                    self.getPDF = true
-                    self.getVideo = false
-                    self.message = self.message + "\nOnly get PDFs"
-                    
                 case "-y":										// Nominate the year
                     if i <= arguments.count {
                         self.year = Int(arguments[i])!
@@ -129,12 +143,10 @@ extension Setup {
             print("\(message)\n")
         }
         print("OPTIONS\n")
-        print("-d        A directory to download the videos to. By default, the download goes in the current working directory")
+        print("-d        A directory to download the videos to. By default, the download goes in WWDCVideos in the user's documents directory")
         print("-a        Download all the session videos (the default)")
         print("-s        A list of one or more session IDs, separated by commas (e.g -s 100, 101, 102 etc)")
         print("-hd | -sd Choose -hd for HD videos (the default) or -sd for SD videos")
-        print("-pdf-only Only get PDFs, i.e. do not download the videos")
-        print("-nopdf    Do not download the related PDFs")
         print("-y        The year to use. The default is 2016. Use a four-digit year")
         exit(0)
     }
@@ -149,7 +161,7 @@ struct Web {
         }
         return baseURL
     }
-
+    
     func getHTMLPage(url: NSURL) -> String {
         do {
             let rawHTML = try String(contentsOfURL: url)
@@ -160,7 +172,7 @@ struct Web {
             exit(0)
         }
     }
-
+    
     func getListOfAllSessions(setup : Setup) -> [String] {
         let baseString = "https://developer.apple.com/videos/wwdc\(setup.year)/"
         let baseURL = validateURL(baseString)
@@ -177,21 +189,18 @@ struct Web {
         if setup.getAll {
             setup.sessionIDs = getListOfAllSessions(setup)
         }
-        if setup.getVideo {
-            for session in setup.sessionIDs {
-                let baseString = "https://developer.apple.com/videos/play/wwdc\(setup.year)/\(session)/"
-                let baseURL = validateURL(baseString)
-                
-                let htmlPage = getHTMLPage(baseURL)
-                let regexString = "<a\\ href=\\\"(.+)\\?dl=1\\\">\(setup.resolution.rawValue)\\ Video"
-                let urlString = extract(regexString, from: htmlPage)
-                let videoURL = validateURL(urlString[0])
-                
-                let fileLocation = setup.saveToDirectory
-                let fileLocationURL = validateURL(fileLocation)
-                
-                _ = Downloader().download(videoURL, to: fileLocationURL)
-            }
+        for session in setup.sessionIDs {
+            let baseString = "https://developer.apple.com/videos/play/wwdc\(setup.year)/\(session)/"
+            let baseURL = validateURL(baseString)
+            
+            let htmlPage = getHTMLPage(baseURL)
+            let regexString = "<a\\ href=\\\"(.+)\\?dl=1\\\">\(setup.resolution.rawValue)\\ Video"
+            let urlString = extract(regexString, from: htmlPage)
+            let videoURL = validateURL(urlString[0])
+            
+            let fileLocation = setup.saveToDirectory
+            
+            _ = Downloader().download(videoURL, to: fileLocation)
         }
     }
 }
@@ -224,51 +233,51 @@ extension Web {
 
 class Downloader : NSObject, NSURLSessionDownloadDelegate {
     var url : NSURL?
-    var fileName : NSURL?
+    var fileName : String?
     
     override init()
     {
         super.init()
     }
     
-    //is called once the download is complete
-    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didFinishDownloadingToURL location: NSURL) {
-        //copy downloaded data to your documents directory with same names as source file
-        let documentsURL =  NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask).first
-        let destinationUrl = documentsURL!.URLByAppendingPathComponent(fileName!.lastPathComponent!)
-        let dataFromURL = NSData(contentsOfURL: location)
-        dataFromURL!.writeToURL(destinationUrl, atomically: true)
-    }
-    
-    //this is to track progress
-    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        let percentage = Double(totalBytesWritten)/Double(totalBytesExpectedToWrite)
-        print("Downloaded \(totalBytesWritten) of \(totalBytesExpectedToWrite) (\(percentage)%)")
-    }
-    
-    // if there is an error during download this will be called
-    func URLSession(session: NSURLSession, task: NSURLSessionTask, didCompleteWithError error: NSError?) {
-        if(error != nil) {
-            //handle the error
-            print("Download interrupted with error: \(error!.localizedDescription)");
-        }
-    }
-    
-    //method to be called to download
-    func download(url: NSURL, to fileName: NSURL) {
+    // Download method
+    func download(url: NSURL, to fileName: String) {
         self.url = url
         self.fileName = fileName
         
-        //download identifier can be customized. I used the "ulr.absoluteString"
         let sessionConfig = NSURLSessionConfiguration.backgroundSessionConfigurationWithIdentifier(url.absoluteString)
         let session = NSURLSession(configuration: sessionConfig, delegate: self, delegateQueue: nil)
         let task = session.downloadTaskWithURL(url)
         task.resume()
     }
+    
+    // *** Delegate callbacks ***
+    // Completion handler
+    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didFinishDownloadingToURL location: NSURL) {
+        //copy downloaded data to your documents directory with same names as source file
+        let documentsURL =  NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask).first
+        let destination = documentsURL!.URLByAppendingPathComponent(fileName!)
+        let destinationUrl = destination.URLByAppendingPathComponent(url!.lastPathComponent!)
+        let dataFromURL = NSData(contentsOfURL: location)
+        dataFromURL!.writeToURL(destinationUrl, atomically: true)
+    }
+    
+    // Progress
+    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let percentage = Double(totalBytesWritten)/Double(totalBytesExpectedToWrite)
+        print("Downloaded \(totalBytesWritten.iso) of \(totalBytesExpectedToWrite.iso) (\(percentage.percentage)%)")
+    }
+    
+    // Error handling
+    func URLSession(session: NSURLSession, task: NSURLSessionTask, didCompleteWithError error: NSError?) {
+        if(error != nil) {
+            //handle the error
+            print("Download interrupted with error: \(error!.localizedDescription)");
+        }
+    }    
 }
 
 // MARK: Where the work is done
-
 let app = Setup()
 Web().getDownloads(app)
 
