@@ -6,49 +6,41 @@
  © 2016 Paul Darcey
  */
 
-import Cocoa
+import Foundation
 
 enum Resolution : String {
     case hd = "HD"
     case sd = "SD"
 }
 
-extension String {
-	// Based on a solution at http://stackoverflow.com/questions/25138339/nsrange-to-rangestring-index/32379600#32379600 by Serhii Yakovenko
-    func rangeFromNSRange(nsRange : NSRange) -> Range<String.Index>? {
-        let from16 = utf16.startIndex.advancedBy(nsRange.location, limit: utf16.endIndex)
-        let to16 = from16.advancedBy(nsRange.length, limit: utf16.endIndex)
-        if let from = String.Index(from16, within: self),
-            let to = String.Index(to16, within: self) {
-            return from ..< to
-        }
-        return nil
-    }
-}
-
 extension Double {
-	// Based on a solution at http://stackoverflow.com/questions/24102814/how-to-use-println-in-swift-to-format-number by Daniel Howard
+    // Based on a solution at http://stackoverflow.com/questions/24102814/how-to-use-println-in-swift-to-format-number by Daniel Howard
     var percentage : String {
         get {
-            let numberFormatter = NSNumberFormatter()
-            numberFormatter.numberStyle = NSNumberFormatterStyle.DecimalStyle
-            numberFormatter.maximumSignificantDigits = 2
-            return numberFormatter.stringFromNumber(self)!
+            let numberFormatter = NumberFormatter()
+            numberFormatter.numberStyle = NumberFormatter.Style.decimal
+            numberFormatter.maximumSignificantDigits = 3
+            numberFormatter.minimumSignificantDigits = 3
+            
+            return numberFormatter.string(from: self)!
         }
     }
 }
 
 extension Int64 {
-	// Based on a solution at http://stackoverflow.com/questions/3263892/format-file-size-as-mb-gb-etc?noredirect=1&lq=1 by Willem Van Onsem
+    // Based on a solution at http://stackoverflow.com/questions/3263892/format-file-size-as-mb-gb-etc?noredirect=1&lq=1 by Willem Van Onsem
     var iso : String {
         get {
             let units = [ "B", "kB", "MB", "GB", "TB" ]
+            let numberFormatter = NumberFormatter()
+            numberFormatter.numberStyle = NumberFormatter.Style.decimal
+            numberFormatter.maximumSignificantDigits = 3
+            numberFormatter.minimumSignificantDigits = 3
+            
             let magnitude = Int(log10(Double(self))/log10(1024))
-            let numberFormatter = NSNumberFormatter()
-            let number = Double(self)/pow(1024.0, Double(magnitude))
-            numberFormatter.numberStyle = NSNumberFormatterStyle.DecimalStyle
-            numberFormatter.maximumSignificantDigits = 2
-            return "\(numberFormatter.stringFromNumber(number)!) \(units[magnitude])"
+            let number = Double(self) / pow(1024.0, Double(magnitude))
+            
+            return "\(numberFormatter.string(from: number)!) \(units[magnitude])"
         }
     }
 }
@@ -105,7 +97,7 @@ class Setup {
                                 sessions = sessions + arguments[j] as String
                                 j += 1
                             }
-                            self.sessionIDs = sessions.componentsSeparatedByString(",")
+                            self.sessionIDs = sessions.components(separatedBy: ",")
                             self.getAll = false
                             self.message = self.message + "Downloading \(self.sessionIDs.count) sessions: \(self.sessionIDs)"
                         } else {
@@ -140,8 +132,8 @@ class Setup {
 }
 
 extension Setup {
-    func displaySyntaxError(additionalMessage: String? = nil) {
-        print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-pdf-only] [-nopdf] [-y Year]\n")
+    func displaySyntaxError(_ additionalMessage: String? = nil) {
+        print("usage: videoDownloader.swift [-d directory] [-a] [-s SessionID1, SessionID2...] [-hd | -sd] [-y Year]\n")
         if let message = additionalMessage {
             print("\(message)\n")
         }
@@ -156,87 +148,98 @@ extension Setup {
 }
 
 struct Web {
-    func validateURL(url : String) -> NSURL {
-        guard let baseURL = NSURL(string: url)
+    func validateURL(_ url : String) -> URL {
+        guard let baseURL = URL(string: url)
             else {
                 print("Error: \(url) doesn't seem to be a valid URL")
                 exit(0)
         }
+        
         return baseURL
     }
     
-    func getHTMLPage(url: NSURL) -> String {
+    func getHTML(_ url: URL) -> String {
         do {
-            let rawHTML = try String(contentsOfURL: url)
+            let rawHTML = try String(contentsOf: url, encoding: .utf8)
             
             return rawHTML
         } catch let error as NSError {
-            print("Error: \(error)")
+            print("Error: \(error.localizedDescription)")
             exit(0)
         }
     }
     
-    func getListOfAllSessions(setup : Setup) -> [String] {
-        let baseString = "https://developer.apple.com/videos/wwdc\(setup.year)/"
-        let baseURL = validateURL(baseString)
+    func getListOfAllSessions(_ setup : Setup) -> [String] {
+        let urlName = "https://developer.apple.com/videos/wwdc\(setup.year)/"
+        let url = validateURL(urlName)
         
-        let htmlPage = getHTMLPage(baseURL)
-        let regexString = "/videos/play/wwdc\(setup.year)/([0-9]*)/"
+        let html = getHTML(url)
+        let regex = "/videos/play/wwdc\(setup.year)/([0-9]*)/"
         
-        let result = extract(regexString, from: htmlPage)
-        print("Getting all \(result.count) sessions: \(result)")
-        return result
+        do {
+            let result = try extract(regex, from: html)
+            
+            return result
+        } catch let error as NSError {
+            print("Error: \(error.localizedDescription)")
+            exit(0)
+        }
     }
     
-    func getDownloads(setup : Setup) {
+    func getDownloads(_ setup : Setup) {
         if setup.getAll {
             setup.sessionIDs = getListOfAllSessions(setup)
         }
         for session in setup.sessionIDs {
-            let baseString = "https://developer.apple.com/videos/play/wwdc\(setup.year)/\(session)/"
-            let baseURL = validateURL(baseString)
+            let urlName = "https://developer.apple.com/videos/play/wwdc\(setup.year)/\(session)/"
+            let url = validateURL(urlName)
             
-            let htmlPage = getHTMLPage(baseURL)
-            let regexString = "<a\\ href=\\\"(.+)\\?dl=1\\\">\(setup.resolution.rawValue)\\ Video"
-            let urlString = extract(regexString, from: htmlPage)
-            let videoURL = validateURL(urlString[0])
-            
-            let fileLocation = setup.saveToDirectory
-            
-            _ = Downloader().download(videoURL, to: fileLocation)
+            let html = getHTML(url)
+            let regex = "<a\\ href=\\\"(.+)\\?dl=1\\\">\(setup.resolution.rawValue)\\ Video"
+            do {
+                let urls = try extract(regex, from: html)
+                let videoURL = validateURL(urls[0])
+                
+                let fileLocation = setup.saveToDirectory
+                
+                Downloader().download(videoURL, to: fileLocation)
+            } catch let error as NSError {
+                print("Error: \(error.localizedDescription)")
+                exit(0)
+            }
         }
     }
 }
 
 extension Web {
-    func extract(regularExpression: String, from text: String) -> [String] {
-        var returnArray : [String] = []
+    func extract(_ regularExpression: String, from text: String) throws -> [String] {
+        var sortedUniqueMatches : [String] = []
         do {
-            let regex = try NSRegularExpression(pattern: regularExpression, options: [])
-            let matches = regex.matchesInString(text, options: [], range: NSMakeRange(0, text.characters.count))
+            let regex = try RegularExpression(pattern: regularExpression, options: [])
+            let matches = regex.matches(in: text, options: [], range: NSMakeRange(0, text.characters.count))
             var matchingResults : [String] = []
             for match in matches {
                 if !NSEqualRanges(match.range, NSMakeRange(NSNotFound, 0)) {
-                    let captureGroup = match.rangeAtIndex(1)
-                    let matchedRange = text.rangeFromNSRange(captureGroup)
-                    let matchedString = text.substringWithRange(matchedRange!)
+                    let captureGroup = match.range(at: 1)
+                    let nsText = NSString.init(string: text)
+                    let matchedString = String.init(nsText.substring(with: captureGroup))
                     matchingResults.append(matchedString)
                 }
             }
             
-            let uniqueIDs = Array(Set(matchingResults))
-            returnArray = uniqueIDs.sort { $0 < $1 }
-            return returnArray
+            let uniqueMatchess = Array(Set(matchingResults))
+            sortedUniqueMatches = uniqueMatchess.sorted { $0 < $1 }
+            
         } catch let error as NSError {
             print("Regex error: \(error.localizedDescription)")
         }
-        return returnArray
+        
+        return sortedUniqueMatches
     }
 }
 
-class Downloader : NSObject, NSURLSessionDownloadDelegate {
-	// Based on a solution at http://stackoverflow.com/questions/28219848/download-file-in-swift by Ahmet Akkök
-    var url : NSURL?
+class Downloader : NSObject, URLSessionDownloadDelegate {
+    var url : URL?
     var fileName : String?
     
     override init()
@@ -244,41 +247,78 @@ class Downloader : NSObject, NSURLSessionDownloadDelegate {
         super.init()
     }
     
-    // Download method
-    func download(url: NSURL, to fileName: String) {
+    // Simple download - use for small downloads
+    func simpleDownload(_ url: URL, to fileName: String) {
+        let downloadData = try? Data(contentsOf: url)
+        if(downloadData != nil) {
+            let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+            let filePath="\(documentsPath)/\(fileName)/\(url.lastPathComponent!)"
+            if (try? downloadData!.write(to: URL(fileURLWithPath: filePath), options: [.atomic])) != nil {
+                print("File is saved!")
+            } else {
+                print("Problem saving downloaded file")
+            }
+        }
+    }
+    
+    // Download method - use for *large* downloads
+    func download(_ url: URL, to fileName: String) {
         self.url = url
         self.fileName = fileName
         
-        let sessionConfig = NSURLSessionConfiguration.backgroundSessionConfigurationWithIdentifier(url.absoluteString)
-        let session = NSURLSession(configuration: sessionConfig, delegate: self, delegateQueue: nil)
-        let task = session.downloadTaskWithURL(url)
+        let sessionConfig = URLSessionConfiguration.background(withIdentifier: url.absoluteString!)
+        sessionConfig.isDiscretionary = true
+        let session = Foundation.URLSession(configuration: sessionConfig, delegate: self, delegateQueue: nil)
+        let task = session.downloadTask(with: url)
         task.resume()
     }
     
     // *** Delegate callbacks ***
     // Completion handler
-    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didFinishDownloadingToURL location: NSURL) {
-        //copy downloaded data to your documents directory with same names as source file
-        let documentsURL =  NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask).first
-        let destination = documentsURL!.URLByAppendingPathComponent(fileName!)
-        let destinationUrl = destination.URLByAppendingPathComponent(url!.lastPathComponent!)
-        let dataFromURL = NSData(contentsOfURL: location)
-        dataFromURL!.writeToURL(destinationUrl, atomically: true)
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        print("Completion handler called Data downloaded to \(location.absoluteString)")
+        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+        let filePath="\(documentsPath)/\(fileName!)/\(url!.lastPathComponent!)"
+        let file = URL(string: filePath)!
+        
+        print("\(location)")
+        
+        do {
+            let downloadData = try Data.init(contentsOf: location, options: [])
+            do {
+                try downloadData.write(to: file, options: .atomic)
+                print("File is saved!")
+                
+                // Delete temp file
+                let fileManager = FileManager.default
+                do {
+                    try fileManager.removeItem(at: url!)
+                    print("Temp file \(url!.path) was removed")
+                } catch {
+                    print("Error")
+                }
+            } catch let error as NSError {
+                print("Error: \(error.localizedDescription)")
+            }
+        } catch let error as NSError {
+            print("Error: \(error.localizedDescription)")
+        }
     }
     
     // Progress
-    func URLSession(session: NSURLSession, downloadTask: NSURLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let percentage = Double(totalBytesWritten)/Double(totalBytesExpectedToWrite)
-        print("Downloaded \(totalBytesWritten.iso) of \(totalBytesExpectedToWrite.iso) (\(percentage.percentage)%)")
+        print("Downloading \(session.configuration.identifier): \(totalBytesWritten.iso) of \(totalBytesExpectedToWrite.iso) (\(percentage.percentage)%) \r")
+        fflush(__stdoutp)			// This, plus the /r in the string, should overwrite the progress on the one line time after time
     }
     
     // Error handling
-    func URLSession(session: NSURLSession, task: NSURLSessionTask, didCompleteWithError error: NSError?) {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: NSError?) {
         if(error != nil) {
             //handle the error
             print("Download interrupted with error: \(error!.localizedDescription)");
         }
-    }    
+    }
 }
 
 // MARK: Where the work is done
